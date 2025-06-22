@@ -11,10 +11,8 @@ from dotenv import load_dotenv
 st.set_page_config(page_title="Crude Oil Risk Dashboard", layout="wide")
 st.title("🛢️ Crude Oil Volatility & Risk Intelligence Dashboard")
 
-# 🔄 Auto-refresh every 10 minutes
 st_autorefresh(interval=600000, key="auto_refresh")
 
-# 📡 Load environment for NewsAPI
 load_dotenv()
 NEWS_API_KEY = os.getenv("NEWSAPI_KEY")
 
@@ -28,7 +26,6 @@ def get_commodity_news():
         return response.json().get("articles", [])
     return []
 
-# 🆕 Download latest data (last 60 days)
 st.info("🔄 Fetching latest crude oil, gold, and USD index data...")
 oil = yf.download("CL=F", period="60d", interval="1d")["Close"]
 gold = yf.download("GC=F", period="60d", interval="1d")["Close"]
@@ -38,17 +35,14 @@ if oil.empty or gold.empty or usd.empty:
     st.error("❌ Failed to fetch data from Yahoo Finance. Please check your internet connection or ticker symbols.")
     st.stop()
 
-# Combine into one DataFrame
 df = pd.concat([oil, gold, usd], axis=1)
 df.columns = ["Price", "Gold", "USD"]
 df.index.name = "Date"
 
-# Calculate metrics
 df["Daily Return"] = df["Price"].pct_change()
 df["10D Volatility"] = df["Daily Return"].rolling(10).std()
 df["VaR_95"] = df["Daily Return"].rolling(10).quantile(0.05)
 
-# Add Event Markers
 event_dates = {
     '2024-04-13': 'Iran attacks Israel',
     '2024-04-15': 'US/NATO response',
@@ -57,25 +51,20 @@ event_dates = {
 }
 df['Event'] = df.index.strftime('%Y-%m-%d').map(event_dates)
 
-# Momentum Strategy
 sma = df['Price'].rolling(10).mean()
 df['Momentum Signal'] = (df['Price'] > sma).astype(int).replace(0, -1)
 df['Momentum Strategy Return'] = df['Momentum Signal'].shift(1) * df['Daily Return']
 df['Cumulative Market Return'] = (1 + df['Daily Return']).cumprod()
 df['Cumulative Momentum Return'] = (1 + df['Momentum Strategy Return']).cumprod()
 
-# Entry/Exit Markers
 df['Signal Change'] = df['Momentum Signal'].diff()
 entries = df[df['Signal Change'] == 2]
 exits = df[df['Signal Change'] == -2]
 
-# Top Risk Days: highest volatility or VaR spikes
 top_risk_days = df.sort_values(by='10D Volatility', ascending=False).head(3)
 
-# --- Tabs Layout ---
 tabs = st.tabs(["🏠 Overview", "📉 Volatility & Risk", "📈 Strategy Backtest", "🌐 Macro Correlation", "🗞️ Market News"])
 
-# --- OVERVIEW TAB ---
 with tabs[0]:
     st.header("Overview")
     st.markdown("""
@@ -101,7 +90,6 @@ with tabs[0]:
     except:
         st.warning("Excel report not found. Generate output/oil_volatility_analysis.xlsx first.")
 
-# --- VOLATILITY TAB ---
 with tabs[1]:
     st.header("Volatility & Value at Risk")
     fig = px.line(df, x=df.index, y=["10D Volatility", "VaR_95"], title="Volatility & VaR with Geopolitical Events")
@@ -121,7 +109,7 @@ with tabs[1]:
     except:
         st.warning("Plot image export needs 'kaleido'. Run: pip install -U kaleido")
 
-# --- STRATEGY TAB ---
+
 with tabs[2]:
     st.header("Backtested Momentum Strategy")
     fig = go.Figure()
@@ -151,7 +139,7 @@ with tabs[2]:
     except Exception as e:
         st.warning("📦 Plot export needs 'kaleido'. Run: pip install -U kaleido")
 
-# --- MACRO CORRELATION TAB ---
+
 with tabs[3]:
     st.header("Macro Correlation Analysis")
     window = st.slider("Rolling Window (days)", 5, 30, 10, key="corr_slider")
@@ -171,7 +159,7 @@ with tabs[3]:
     except:
         st.warning("📦 Plot export needs 'kaleido'. Run: pip install -U kaleido")
 
-# --- NEWS TAB ---
+
 with tabs[4]:
     st.header("🗞️ Latest Commodity & Macro Market News")
     st.markdown("Stay informed with recent headlines influencing crude oil, gold, and global markets.")
@@ -185,6 +173,6 @@ with tabs[4]:
     else:
         st.warning("No news available at the moment. Please try again later.")
 
-# --- Footer ---
+
 st.markdown("---")
 st.caption("Crafted with 🔍 by Sanjay Rajan • Streamlit + Plotly + Python")
